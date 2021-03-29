@@ -1,0 +1,197 @@
+---
+title: "ISyE-6644 Project 1 - Pandemic Flu Spread"
+author: '[Muhammad Omer Farooq](https://www.linkedin.com/in/momerfarooq/)'
+date: "03/09/2021"
+output:
+  word_document:
+    toc: yes
+  pdf_document: default
+  html_document:
+    df_print: paged
+    highlight: tango
+    theme: cerulean
+    toc: yes
+---
+
+```{r setup,include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+#needed to knit properly if using Python in any of the chunks
+knitr::knit_engines$set(python = reticulate::eng_python)
+
+```
+
+# 1. Deterministic SI Model
+
+```{r deterministic SI model}
+
+require(EpiModel)
+set.seed(101)
+
+param <- param.dcm(inf.prob = 0.06, act.rate = 20)
+init <- init.dcm(s.num = 20, i.num = 1)
+control <- control.dcm(type = "SI", nsteps = 50)
+mod <- dcm(param, init, control)
+
+mod
+plot(mod)
+
+#summary function shows the state of compartments at a given time
+summary(mod, at = 25) 
+
+```
+
+```{r deterministic SI model - output}
+
+#creating output dataframe
+s_num <- mod$epi$s.num
+i_num <- mod$epi$i.num
+si_flow <- mod$epi$si.flow
+num <- mod$epi$num
+dcm_si <- data.frame(s_num, i_num, si_flow, num)
+colnames(dcm_si) <- c("Susceptible", "Infected", "SI Flow", "Total")
+dcm_si <- round(dcm_si, digits = 2)
+dcm_si
+
+```
+
+# 2. Deterministic SIR Model
+
+```{r deterministic SIR model}
+
+set.seed(101)
+
+param1 <- param.dcm(inf.prob = 0.06, act.rate = 20, rec.rate = 1/3)
+init1 <- init.dcm(s.num = 20, i.num = 1, r.num = 0)
+control1 <- control.dcm(type = "SIR", nsteps = 50, dt = 1)
+mod1 <- dcm(param1, init1, control1)
+
+#plotting the model
+par(mar = c(3.2, 3, 2, 1), mgp = c(2, 1, 0), mfrow = c(1, 2))
+plot(mod1, popfrac = FALSE, alpha = 0.5,
+     lwd = 4, main = "Flow Histrograms")
+plot(mod1, y = "si.flow", lwd = 4, col = "firebrick",
+     main = "Disease Incidence", legend = "n")
+
+```
+
+
+```{r deterministic SIR model - output}
+
+#creating output dataframe
+s_num1 <- mod1$epi$s.num
+i_num1 <- mod1$epi$i.num
+r_num <- mod1$epi$r.num
+si_flow1 <- mod1$epi$si.flow
+ir_flow <- mod1$epi$ir.flow
+num1 <- mod1$epi$num
+dcm_sir <- data.frame(s_num1, i_num1, r_num, si_flow1, ir_flow, num1)
+colnames(dcm_sir) <- c("Susceptible", "Infected","Recovered", "SI Flow","IR Flow", "Total")
+dcm_sir <- round(dcm_sir, digits = 2)
+dcm_sir
+
+```
+
+# 3. Stochastic SI Model
+
+```{r stochastic SI model}
+
+set.seed(101)
+
+param2 <- param.icm(inf.prob = 0.06, act.rate = 20)
+init2 <- init.icm(s.num = 20, i.num = 1)
+control2 <- control.icm(type = "SI", nsims = 1000, nsteps = 50)
+mod2 <- icm(param2, init2, control2)
+mod2
+
+#plotting the model
+plot(mod2)
+
+#with each simulation plot & average
+plot(mod2, sim.lines = TRUE, mean.smooth = TRUE, qnts.smooth = TRUE)
+
+```
+
+```{r stochastic SI model - day 1 infections}
+
+icm_si <- round(as.data.frame(mod2, out = "mean"), digits = 2)
+
+#average of 1000 simulations
+icm_si
+
+#day 1 data
+icm_si1 <- round(as.data.frame(mod2, out = "vals"),digits = 2)
+day1_si_distro <- icm_si1[icm_si1$time==1,]
+
+#day 1 infections histogram
+hist(day1_si_distro$i.num)
+
+```
+
+```{r stochastic SI model - epidemic duration}
+
+#extracting epidemic duration for each simulation
+duration_si_distro <- icm_si1[icm_si1$s.num>0,]
+duration_icm_si <- data.frame(table(duration_si_distro$sim))
+colnames(duration_icm_si) <- c("Simulation", "Duration")
+duration_icm_si$Duration <- duration_icm_si$Duration+1
+
+#epidemic duration histogram, mean & median
+hist(duration_icm_si$Duration)
+mean(duration_icm_si$Duration)
+median(duration_icm_si$Duration)
+
+```
+
+# 4. Stochastic SIR Model
+
+```{r Stochastic SIR Model}
+
+set.seed(101)
+
+param3 <- param.icm(inf.prob = 0.06, act.rate = 20, rec.rate = 1/3)
+init3 <- init.icm(s.num = 20, i.num = 1, r.num = 0)
+control3 <- control.icm(type = "SIR", nsteps = 50, nsims = 1000)
+mod3 <- icm(param3, init3, control3)
+
+#plotting the model
+plot(mod3)
+
+#each simulation plot with average
+plot(mod3, sim.lines = TRUE, mean.smooth = TRUE, qnts.smooth = TRUE)
+
+```
+
+```{r Stochastic SIR Model - day 1 infections}
+
+icm_sir <- round(as.data.frame(mod3, out = "mean"), digits = 2)
+
+#average of 1000 simulations
+icm_sir
+
+#day 1 data
+icm_sir1 <- round(as.data.frame(mod3, out = "vals"),digits = 2)
+day1_sir_distro <- icm_sir1[icm_sir1$time==1,]
+
+#day 1 infections histogram
+hist(day1_sir_distro$i.num)
+
+```
+
+```{r stochastic SIR model - epidemic duration}
+
+#extracting epidemic duration for each simulation
+duration_sir_distro <- icm_sir1[icm_sir1$s.num>0 ,]
+duration_sir_distro <- duration_sir_distro[duration_sir_distro$i.num>0 ,]
+duration_icm_sir <- data.frame(table(duration_sir_distro$sim))
+colnames(duration_icm_sir) <- c("Simulation", "Duration")
+duration_icm_sir$Duration <- duration_icm_sir$Duration+1
+
+#epidemic duration histogram, mean & median
+hist(duration_icm_sir$Duration)
+mean(duration_icm_sir$Duration)
+median(duration_icm_sir$Duration)
+
+```
+
